@@ -1,0 +1,5 @@
+.vscode/
+data/
+.vscode/
+__pycache__
+search_history_*.txt
