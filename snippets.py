@@ -4,9 +4,9 @@ import os
 import json
 import datetime
 
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout, QTreeView, QSplitter, QComboBox, QAbstractItemView
-from PyQt5.QtGui import QColor, QTextCharFormat, QFont, QSyntaxHighlighter, QStandardItemModel, QStandardItem
-from PyQt5.QtCore import Qt, QItemSelectionModel, QItemSelection
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout, QGridLayout, QCheckBox, QHeaderView, QLabel, QTreeView, QSplitter, QComboBox, QAbstractItemView
+from PyQt5.QtGui import QColor, QTextCharFormat, QFont, QSyntaxHighlighter, QStandardItemModel, QStandardItem, QIcon
+from PyQt5.QtCore import Qt, QItemSelectionModel, QItemSelection, QSettings, QRegularExpression, QSortFilterProxyModel, QModelIndex, QMimeData
 
 
 def format(color, style=''):
@@ -191,6 +191,102 @@ class PlainTextHighlighter(QSyntaxHighlighter):
         self.setCurrentBlockState(0)
 
 
+class RecursiveFilterProxyModel(QSortFilterProxyModel):
+    def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
+        for column in range(self.sourceModel().columnCount(source_parent)):
+            sub_index = self.sourceModel().index(source_row, column, source_parent)
+            text = self.sourceModel().data(sub_index, Qt.DisplayRole)
+            if text is not None:
+                regExp = self.filterRegExp().pattern()
+                if regExp:
+                    try:
+                        if re.search(regExp, str(text)):
+                            return True
+                    except re.error:
+                        pass
+                else:
+                    regularExp = self.filterRegularExpression()
+                    if regularExp.match(str(text)).hasMatch():
+                        return True
+
+        index = self.sourceModel().index(source_row, 0, parent=source_parent)
+        rows = self.sourceModel().rowCount(index)
+        for row in range(rows):
+            if self.filterAcceptsRow(row, index):
+                return True
+
+        return super().filterAcceptsRow(source_row, source_parent)
+
+
+class PlainTextEdit(QTextEdit):
+    def insertFromMimeData(self, source: QMimeData):
+        if source.hasText():
+            text = source.text()
+            self.insertPlainText(text)
+
+class MySearchComboBox(QComboBox):
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+
+        self.history = []
+        self.history_file = "search_history_tree_view.txt"
+
+        self.setEditable(True)
+        self.load_history()
+        self.setCurrentText('')
+    
+    def on_save_text(self):
+        keyword = self.currentText().strip()
+        if not keyword:
+            return
+
+        self.update_history(keyword)
+
+        
+    def update_history(self, keyword):
+        print(f'update_history keyward={keyword}')
+
+        if keyword in self.history:
+            self.history.remove(keyword)
+            
+        # 插入到列表开头
+        self.history.insert(0, keyword)
+        
+        # 限制历史记录数量
+        if len(self.history) > 100:
+            self.history = self.history[:100]
+            
+        # 更新下拉列表
+        self.clear()
+        self.addItems(self.history)
+        
+        # 保存到文件
+        self.save_history()
+
+        self.setCurrentIndex(0)
+
+    def save_history(self):
+        # print(f'save_history')
+        with open(self.history_file, "w", encoding="utf-8") as f:
+            for item in self.history:
+                f.write(f"{item}\n")
+
+    def load_history(self):
+        # print(f'load_history')
+        """从文件加载历史记录"""
+        if os.path.exists(self.history_file):
+            with open(self.history_file, "r", encoding="utf-8") as f:
+                lines = [line.strip() for line in f.readlines()]
+                # 去重处理并保留顺序
+                seen = set()
+                self.history = []
+                for line in lines:
+                    if line and line not in seen:
+                        seen.add(line)
+                        self.history.append(line)
+                self.addItems(self.history)
+
+
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -200,36 +296,87 @@ class MainWindow(QWidget):
             os.makedirs(self.data_dir)
 
         self.input_widgets = {}
-        # 使用 QSplitter 分割界面
-        splitter = QSplitter(Qt.Horizontal)
+
+
+        # 添加搜索框
+        self.search_box = MySearchComboBox(self)
+        self.search_box.setPlaceholderText("Search in tree")
+        self.search_box.currentTextChanged.connect(self.filter_tree_view_slot)
+
+        self.save_search_btn = QPushButton('Save Keywords')
+        self.save_search_btn.clicked.connect(self.search_box.on_save_text)
+        self.save_search_btn.setMaximumWidth(110)
+        self.save_search_btn.setMaximumHeight(110)
+
+        self.regex_cache = {}
+
+        self.regex_check_box = QCheckBox('Regex')
+        self.regex_check_box.setCheckState(Qt.CheckState.Unchecked)
+        self.regex_check_box.setMaximumWidth(60)
+        self.regex_check_box.setMaximumHeight(110)
+        
+        self.search_widget = QWidget()
+        self.search_widget.setLayout(QGridLayout())
+        self.search_widget.layout().addWidget(self.search_box, 0, 0)
+        self.search_widget.layout().addWidget(self.regex_check_box, 0, 1)
+        self.search_widget.layout().addWidget(self.save_search_btn, 0, 2)
+        self.search_widget.layout().setContentsMargins(0, 0, 0, 0)
+
+
+        self.hor_splitter = QSplitter(Qt.Horizontal)
+        self.hor_splitter.setObjectName("hor_splitter")
+
+        self.content_loaded_from_json = None
+        self.title_loaded_from_json = None
+        self.placeholder_dict_loaded_from_json = None
+        self.content_type_loaded_from_json = None
 
         # 左侧 TreeView
-        self.tree_view = QTreeView()
-        self.model = QStandardItemModel()
-        self.model.setHorizontalHeaderLabels(['Title', 'Type', 'Created Time'])
-        self.tree_view.setModel(self.model)
-        self.tree_view.setEditTriggers(QTreeView.NoEditTriggers)  # 不允许修改内容
-        self.tree_view.setSelectionMode(QTreeView.SingleSelection)  # 设置选择模式为单选
-        self.tree_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.tree = QTreeView()
+        self.tree_model = QStandardItemModel()
+        self.tree_model.setHorizontalHeaderLabels(['Title', 'Type', 'Created Time'])
 
-        self.tree_view.clicked.connect(self.on_tree_item_clicked)
-        splitter.addWidget(self.tree_view)
+        self.proxy_model = RecursiveFilterProxyModel()
+        self.proxy_model.setSourceModel(self.tree_model)
+        self.proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)  # 不区分大小写
+
+        self.tree.setModel(self.proxy_model)
+        self.tree.setEditTriggers(QTreeView.NoEditTriggers)  # 不允许修改内容
+        self.tree.setSelectionMode(QTreeView.SingleSelection)  # 设置选择模式为单选
+        self.tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+
+        self.tree.clicked.connect(self.on_tree_item_clicked)
+        self.tree.selectionModel().selectionChanged.connect(self.on_selection_changed)
+
+
+        widget_with_tree_search = QWidget()
+        widget_with_tree_search.setLayout(QVBoxLayout())
+        widget_with_tree_search.layout().addWidget(self.search_widget)
+        widget_with_tree_search.layout().addWidget(self.tree)
+        widget_with_tree_search.layout().setContentsMargins(0,0,0,0)
+        
+        self.hor_splitter.addWidget(widget_with_tree_search)
 
         right_widget = QWidget()
         right_layout = QVBoxLayout()
+        right_layout.setContentsMargins(0,0,0,0)
 
         # 显示 title 和 type 的控件
         info_layout = QHBoxLayout()
         self.title_lineedit = QLineEdit()
+        self.title_lineedit.textChanged.connect(self.title_changed_slot)
         # 允许 title_lineedit 被修改
         self.title_lineedit.setReadOnly(False)
         self.type_combobox = QComboBox()
         self.type_combobox.addItems(['Plain text', 'Python', 'C++'])
+        self.type_combobox.currentTextChanged.connect(self.apply_highlighter)
 
         # 新增删除和新增按钮
         self.delete_button = QPushButton("-")
         self.add_button = QPushButton("+")
-        
+        self.delete_button.setMaximumWidth(40)
+        self.add_button.setMaximumWidth(40)
+
         self.delete_button.clicked.connect(self.delete_snippet)
         self.add_button.clicked.connect(self.add_snippet)
 
@@ -240,7 +387,11 @@ class MainWindow(QWidget):
 
         right_layout.addLayout(info_layout)
 
-        self.text_edit = QTextEdit()
+        self.input_layout = QVBoxLayout()
+        right_layout.addLayout(self.input_layout)
+
+
+        self.text_edit = PlainTextEdit()
         self.text_edit_replaced = QTextEdit()
         self.text_edit_replaced.setReadOnly(True)
 
@@ -252,12 +403,15 @@ class MainWindow(QWidget):
         self.cpp_highlighter_replaced = CppHighlighter(self.text_edit_replaced.document())
         self.plain_text_highlighter_replaced = PlainTextHighlighter(self.text_edit_replaced.document())
 
-        self.text_edit.textChanged.connect(self.update_input_layout)
-        right_layout.addWidget(self.text_edit)
-        right_layout.addWidget(self.text_edit_replaced)
+        self.text_edit.textChanged.connect(self.text_edit_changed)
 
-        self.input_layout = QVBoxLayout()
-        right_layout.addLayout(self.input_layout)
+        self.right_vert_splitter = QSplitter(Qt.Vertical, self)
+        self.right_vert_splitter.setObjectName("right_vert_splitter")
+
+        self.right_vert_splitter.addWidget(self.text_edit)
+        self.right_vert_splitter.addWidget(self.text_edit_replaced)
+
+        right_layout.addWidget(self.right_vert_splitter)
 
         # # 保留 replace 按钮
         # self.replace_button = QPushButton("Replace")
@@ -269,22 +423,85 @@ class MainWindow(QWidget):
         right_layout.addWidget(self.save_button)
 
         right_widget.setLayout(right_layout)
-        splitter.addWidget(right_widget)
+        self.hor_splitter.addWidget(right_widget)
 
         main_layout = QVBoxLayout()
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(self.hor_splitter)
         self.setLayout(main_layout)
 
         self.load_snippets()
         self.current_snippet_file = None
 
-        index = self.model.index(0, 0)
+        index = self.tree_model.index(0, 0)
         self.select_tree_item(index)
         self.on_tree_item_clicked(index)
 
+        app_name = 'Snippets Everything'
+        self.setWindowTitle(app_name)
+        self.setGeometry(100, 100, 800, 600)
+        self.setWindowIcon(QIcon('pen.ico'))
+        self.settings = QSettings("Philips", app_name)
+
+        self.setWindowTitle(app_name)
+        self.load_settings()
+
+    def closeEvent(self, event):
+        self.save_snippet()
+
+        self.save_settings()
+        event.accept()
+
+
+    def save_settings(self):
+        # geometry
+        self.settings.setValue("geometry", self.saveGeometry())
+
+        # splitter
+        self.settings.setValue(self.hor_splitter.objectName(), self.hor_splitter.saveState())
+        self.settings.setValue(self.right_vert_splitter.objectName(), self.right_vert_splitter.saveState())
+
+
+    def load_settings(self):
+        # geometry
+        geometry = self.settings.value("geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+
+        # splitter
+        splitter_state = self.settings.value(self.hor_splitter.objectName())
+        if splitter_state:
+            self.hor_splitter.restoreState(splitter_state)
+
+        splitter_state = self.settings.value(self.right_vert_splitter.objectName())
+        if splitter_state:
+            self.right_vert_splitter.restoreState(splitter_state)
+
+
+    def filter_tree_view_slot(self, text):
+        if self.regex_check_box.isChecked():
+            if text in self.regex_cache:
+                regex = self.regex_cache[text]
+            else:
+                regex = QRegularExpression(text)
+                self.regex_cache[text] = regex
+
+            if regex.isValid():
+                # print(f"set regex: '{text}'")
+                self.proxy_model.setFilterRegularExpression(regex)
+                self.tree.expandAll()
+                return
+
+        # print(f"set filter wildcard: '{text}'")
+        self.proxy_model.setFilterRegularExpression(text)
+        self.proxy_model.setFilterCaseSensitivity(Qt.CaseInsensitive)  # 不区分大小写
+        self.tree.expandAll()
+
     def load_snippets(self):
-        self.model.clear()
-        self.model.setHorizontalHeaderLabels(['Title', 'Type', 'Created Time'])
+        self.tree_model.clear()
+        self.tree_model.setHorizontalHeaderLabels(['Title', 'Type', 'File', 'Timestamp'])
+        self.tree.setColumnHidden(2, True) 
+        # self.tree.setColumnHidden(3, True) 
+
         snippets = []
         for filename in os.listdir(self.data_dir):
             if filename.endswith('.json'):
@@ -297,58 +514,109 @@ class MainWindow(QWidget):
                     print(f"Error loading {filename}: {e}")
 
         # 按创建时间排序
-        snippets.sort(key=lambda x: x.get('created_time', ''))
+        snippets.sort(key=lambda x: x.get('timestamp', ''))
         for snippet in snippets:
+
             title = snippet.get('title', 'Unknown')
-            snippet_type = snippet.get('type', 'Unknown')
-            created_time = snippet.get('created_time', '')
             title_item = QStandardItem(title)
+            
+            snippet_type = snippet.get('type', 'Unknown')
             type_item = QStandardItem(snippet_type)
-            created_time_item = QStandardItem(created_time)
-            self.model.appendRow([title_item, type_item, created_time_item])
+            
+            file_path = snippet.get('file_path', '')
+            file_path_item = QStandardItem(file_path)
+
+            timestamp = snippet.get('timestamp', '')
+            timestamp_item = QStandardItem(timestamp)
+            
+            self.tree_model.appendRow([title_item, type_item, file_path_item, timestamp_item])
+
+        self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        # self.tree.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+
+    def on_selection_changed(self, selected, deselected):
+        if selected.indexes():
+            index = selected.indexes()[0]
+            self.handle_item_selection(index)
 
     def on_tree_item_clicked(self, index):
-        title = self.model.itemFromIndex(self.model.index(index.row(), 0)).text()
+        self.handle_item_selection(index)
+
+    def handle_item_selection(self, index):
+        if self.text_edit.toPlainText() != self.content_loaded_from_json:
+            # print('content changed, need to save!!!')
+            self.save_snippet()
+        # else:
+        #     print('content not changed')
+
+        if self.title_lineedit.text() != self.title_loaded_from_json:
+            # print('title changed, need to save!!!')
+            self.save_snippet()
+        # else:
+        #     print('title not changed')
+
+        if self.type_combobox.currentText() != self.content_type_loaded_from_json:
+            # print('type_combobox changed, need to save!!!')
+            self.save_snippet()
+        # else:
+            # print('type_combobox not changed')
+
+        previous_values = {placeholder: input_field.text() for placeholder, input_field in self.input_widgets.items()}
+        if previous_values != self.placeholder_dict_loaded_from_json:
+            # print('placeholder_dict_loaded_from_json changed, need to save!!!')
+            self.save_snippet()
+        # else:
+            # print('placeholder_dict_loaded_from_json not changed')
+
+        # title = self.tree_model.itemFromIndex(self.tree_model.index(index.row(), 0)).text()
+        file_path_from_tree = self.tree_model.itemFromIndex(self.tree_model.index(index.row(), 2)).text()
+
         for filename in os.listdir(self.data_dir):
             if filename.endswith('.json'):
                 file_path = os.path.join(self.data_dir, filename)
                 try:
+
                     with open(file_path, 'r', encoding='utf-8') as f:
                         snippet = json.load(f)
                         
-                        
-                        if snippet.get('title') == title:
-                            
-                            # self.text_edit.blockSignals(True)
-                            
-                            self.title_lineedit.setText(title)
-                            type_index = self.type_combobox.findText(snippet.get('type', 'Plain text'))
+                        if snippet.get('file_path') == file_path_from_tree:
+
+                            # print(f'file_path={file_path} {snippet}')
+                            self.title_loaded_from_json = snippet.get('title', '')
+                            self.title_lineedit.setText(self.title_loaded_from_json)
+
+                            content_type = snippet.get('type', 'Plain text')
+                            type_index = self.type_combobox.findText(content_type)
                             self.type_combobox.setCurrentIndex(type_index)
+
+                            self.content_type_loaded_from_json = content_type
                             
-                            self.text_edit.setPlainText(snippet.get('content', ''))
+                            self.content_loaded_from_json = snippet.get('content', '')
+                            self.text_edit.setPlainText(self.content_loaded_from_json)
+
+
                             self.update_input_layout()
                             self.current_snippet_file = file_path
-                            # 加载占位符的值
                             
-                            self.apply_highlighter(snippet.get('type', ''))
+                            self.apply_highlighter(content_type)
 
+                            self.placeholder_dict_loaded_from_json = dict()
                             for placeholder, value in snippet.items():
                                 if placeholder.startswith('$') and placeholder in self.input_widgets:
-                                    print(f'placeholder={placeholder} value={value}')
+                                    # print(f'placeholder={placeholder} value={value}')
                                     self.input_widgets[placeholder].setText(value)
-
-                            # self.text_edit.blockSignals(False)
+                                    self.placeholder_dict_loaded_from_json[placeholder] = value
 
                             self.replace_placeholders()
                             
                             break
-                
+   
                 
                 except Exception as e:
                     print(f"Error loading {filename}: {e}")
-
+        
     def update_input_layout(self):
-        print('update_input_layout')
+        # print('update_input_layout')
         # 保存之前输入框的值
         previous_values = {placeholder: input_field.text() for placeholder, input_field in self.input_widgets.items()}
 
@@ -377,41 +645,81 @@ class MainWindow(QWidget):
                 unique_placeholders.append(placeholder)
 
         for placeholder in unique_placeholders:
-            label = QLineEdit(placeholder)
-            label.setReadOnly(True)
+            label = QLabel(placeholder)
+            # label.setReadOnly(True)
             input_field = QLineEdit()
+            input_field.textChanged.connect(self.input_field_changed)
             # 恢复之前输入框的值
             if placeholder in previous_values:
                 input_field.setText(previous_values[placeholder])
-                input_field.textChanged.connect(self.replace_placeholders)
 
-            print(f'placeholder={placeholder} input_field={input_field}')
+            # print(f'placeholder={placeholder} input_field={input_field}')
             self.input_widgets[placeholder] = input_field
 
             hbox = QHBoxLayout()
+            label.setMinimumWidth(80)
+            label.setMaximumWidth(200)
             hbox.addWidget(label)
             hbox.addWidget(input_field)
             self.input_layout.addLayout(hbox)
 
+        self.replace_placeholders()
+
+    def text_edit_changed(self):
+        self.update_input_layout()
+
+    def title_changed_slot(self):
+        pass
+
+    def input_field_changed(self):
+        # print('input_field_changed')
+        self.replace_placeholders()
+
+
+    # def replace_placeholders2(self):
+    #     # print('replace_placeholders')
+    #     code = self.text_edit.toPlainText()
+    #     for placeholder, input_field in self.input_widgets.items():
+    #         replacement = input_field.text()
+    #         if replacement:
+    #             code = code.replace(placeholder, self.to_html_with_color(replacement))
+    #     self.text_edit_replaced.setHtml(code)
+
     def replace_placeholders(self):
+        # print('replace_placeholders')
         code = self.text_edit.toPlainText()
-        for placeholder, input_field in self.input_widgets.items():
-            replacement = input_field.text()
-            if replacement:
-                code = code.replace(placeholder, replacement)
-        self.text_edit_replaced.setPlainText(code)
+
+        replaced_code = ''
+        if self.type_combobox.currentText() == 'Plain text':
+            for placeholder, input_field in self.input_widgets.items():
+                replacement = input_field.text()
+                if replacement:
+                    code = code.replace(placeholder, f'<span style="color: red;">{replacement}</span>')
+
+            replaced_code = (f'<p style="white-space: pre-wrap; color: green;">{code}</p>')
+            self.text_edit_replaced.setHtml(replaced_code)
+        else:
+            for placeholder, input_field in self.input_widgets.items():
+                replacement = input_field.text()
+                if replacement:
+                    code = code.replace(placeholder, replacement)
+            replaced_code = code
+            self.text_edit_replaced.setPlainText(replaced_code)
 
     def save_snippet(self):
         if not self.current_snippet_file:
-            print("No snippet is currently selected.")
+            # print("No snippet is currently selected.")
             return
+        
         title = self.title_lineedit.text()
+        print(f'title={title} saved')
         snippet_type = self.type_combobox.currentText()
         content = self.text_edit.toPlainText()
         placeholders = re.findall(r'\$\w+', content)
 
-        # 获取当前时间作为创建时间
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        now = datetime.datetime.now()
+        timestamp = now.strftime("%Y-%m-%d %H:%M:%S.%f")
 
         # 构建包含占位符值的字典
         placeholder_dict = {placeholder: self.input_widgets[placeholder].text() if placeholder in self.input_widgets else '' for placeholder in placeholders}
@@ -420,7 +728,8 @@ class MainWindow(QWidget):
             'type': snippet_type,
             'title': title,
             'content': content,
-            'created_time': now,
+            'timestamp': timestamp,
+            'file_path': self.current_snippet_file,
             **placeholder_dict
         }
 
@@ -430,6 +739,7 @@ class MainWindow(QWidget):
             self.load_snippets()
         except Exception as e:
             print(f"Error saving snippet: {e}")
+
 
     def apply_highlighter(self, snippet_type):
         if snippet_type == 'Python':
@@ -444,7 +754,6 @@ class MainWindow(QWidget):
             self.plain_text_highlighter.setDocument(self.text_edit.document())
             self.plain_text_highlighter_replaced.setDocument(self.text_edit_replaced.document())
 
-
     def delete_snippet(self):
         if self.current_snippet_file:
             try:
@@ -456,7 +765,7 @@ class MainWindow(QWidget):
                 self.update_input_layout()
                 self.current_snippet_file = None
 
-                index = self.model.index(0, 0)
+                index = self.tree_model.index(0, 0)
                 self.select_tree_item(index)
                 self.on_tree_item_clicked(index)
                 
@@ -470,29 +779,30 @@ class MainWindow(QWidget):
         new_type = "Plain text"
         new_content = ""
 
-        # 获取当前时间作为创建时间
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.datetime.now()
+        timestamp = now.strftime("%Y-%m-%d %H:%M:%S.%f")
+
+        file_name_ts = now.strftime("%Y%m%d%H%M%S%f")
+        file_name = f"snippet_{file_name_ts}.json"
+        file_path = os.path.join(self.data_dir, file_name)
 
         new_snippet = {
             'type': new_type,
             'title': new_title,
             'content': new_content,
-            'created_time': now
+            'timestamp': timestamp,
+            'file_path': file_path
         }
 
-        # 生成以snippet开头加上时间戳的文件名
-        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
-        file_name = f"snippet_{timestamp}.json"
-        file_path = os.path.join(self.data_dir, file_name)
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(new_snippet, f, ensure_ascii=False, indent=4)
             self.load_snippets()
-            # 根据 created_time 匹配新添加的代码片段
-            for i in range(self.model.rowCount()):
-                created_time_item = self.model.item(i, 2)
-                if created_time_item.text() == now:
-                    index = self.model.index(i, 0)
+            # 根据 timestamp 匹配新添加的代码片段
+            for i in range(self.tree_model.rowCount()):
+                timestamp_item = self.tree_model.item(i, 3)
+                if timestamp_item.text() == timestamp:
+                    index = self.tree_model.index(i, 0)
                     self.select_tree_item(index)
                     self.on_tree_item_clicked(index)
                     break
@@ -500,10 +810,10 @@ class MainWindow(QWidget):
             print(f"Error adding snippet: {e}")
 
     def select_tree_item(self, index):
-        start_index = self.model.index(index.row(), 0)
-        end_index = self.model.index(index.row(), self.model.columnCount() - 1)
+        start_index = self.tree_model.index(index.row(), 0)
+        end_index = self.tree_model.index(index.row(), self.tree_model.columnCount() - 1)
         selection = QItemSelection(start_index, end_index)
-        self.tree_view.selectionModel().select(selection, QItemSelectionModel.SelectCurrent)
+        self.tree.selectionModel().select(selection, QItemSelectionModel.SelectCurrent)
 
 
 if __name__ == '__main__':
