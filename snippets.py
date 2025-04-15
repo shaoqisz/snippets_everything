@@ -485,6 +485,8 @@ class MainWindow(QWidget):
         right_layout.addLayout(info_layout)
 
         self.input_layout = QVBoxLayout()
+        self.input_layout.setContentsMargins(0,0,0,0)
+        self.input_layout.setSpacing(2)
         right_layout.addLayout(self.input_layout)
 
 
