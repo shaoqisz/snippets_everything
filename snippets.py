@@ -6,7 +6,7 @@ import datetime
 
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout, QGridLayout, QMessageBox, QCheckBox, QHeaderView, QLabel, QTreeView, QSplitter, QComboBox, QAbstractItemView
 from PyQt5.QtGui import QColor, QTextCharFormat, QFont, QSyntaxHighlighter, QStandardItemModel, QStandardItem, QIcon
-from PyQt5.QtCore import Qt, QItemSelectionModel, QItemSelection, QSettings, QRegularExpression, QSortFilterProxyModel, QModelIndex, QMimeData
+from PyQt5.QtCore import Qt, QItemSelectionModel, QItemSelection, QSettings, QRegularExpression, QSortFilterProxyModel, QModelIndex, QMimeData, QTimer
 
 
 def format(color, style=''):
@@ -676,16 +676,6 @@ class MainWindow(QWidget):
         # print('input_field_changed')
         self.replace_placeholders()
 
-
-    # def replace_placeholders2(self):
-    #     # print('replace_placeholders')
-    #     code = self.text_edit.toPlainText()
-    #     for placeholder, input_field in self.input_widgets.items():
-    #         replacement = input_field.text()
-    #         if replacement:
-    #             code = code.replace(placeholder, self.to_html_with_color(replacement))
-    #     self.text_edit_replaced.setHtml(code)
-
     def replace_placeholders(self):
         # print('replace_placeholders')
         code = self.text_edit.toPlainText()
@@ -737,10 +727,45 @@ class MainWindow(QWidget):
         try:
             with open(self.current_snippet_file, 'w', encoding='utf-8') as f:
                 json.dump(snippet, f, ensure_ascii=False, indent=4)
-            self.load_snippets()
+
+            self.change_item(self.current_snippet_file, snippet_type, title, timestamp)
+        
         except Exception as e:
             print(f"Error saving snippet: {e}")
 
+
+    def change_item(self, file_path, snippet_type, title, timestamp):
+        # 遍历 tree_model 的所有行
+        for row in range(self.tree_model.rowCount()):
+            # 获取当前行的 file_path 项
+            file_path_item = self.tree_model.item(row, 2)
+            if file_path_item and file_path_item.text() == file_path:
+                # 修改 title 项
+                title_item = self.tree_model.item(row, 0)
+                if title_item:
+                    title_item.setText(title)
+
+                # 修改 snippet_type 项
+                type_item = self.tree_model.item(row, 1)
+                if type_item:
+                    type_item.setText(snippet_type)
+
+                # 修改 timestamp 项
+                timestamp_item = self.tree_model.item(row, 3)
+                if timestamp_item:
+                    timestamp_item.setText(timestamp)
+                break
+
+
+    def del_item(self, file_path):
+        # 遍历 tree_model 的所有行
+        for row in range(self.tree_model.rowCount()):
+            # 获取当前行的 file_path 项
+            file_path_item = self.tree_model.item(row, 2)
+            if file_path_item and file_path_item.text() == file_path:
+                # 删除匹配的行
+                self.tree_model.removeRow(row)
+                break
 
     def apply_highlighter(self, snippet_type):
         if snippet_type == 'Python':
@@ -764,16 +789,17 @@ class MainWindow(QWidget):
         if self.current_snippet_file:
             try:
                 os.remove(self.current_snippet_file)
-                self.load_snippets()
-                self.title_lineedit.clear()
-                self.type_combobox.setCurrentIndex(0)
-                self.text_edit.clear()
-                self.update_input_layout()
-                self.current_snippet_file = None
+                self.del_item(self.current_snippet_file)
 
-                index = self.tree_model.index(0, 0)
-                self.select_tree_item(index)
-                self.on_tree_item_clicked(index)
+                # self.title_lineedit.clear()
+                # self.type_combobox.setCurrentIndex(0)
+                # self.text_edit.clear()
+                # self.update_input_layout()
+                # self.current_snippet_file = None
+
+                # index = self.tree_model.index(0, 0)
+                # self.select_tree_item(index)
+                # self.on_tree_item_clicked(index)
                 
             except Exception as e:
                 print(f"Error deleting snippet: {e}")
