@@ -519,6 +519,12 @@ class MainWindow(QWidget):
         # self.save_button.clicked.connect(self.save_snippet)
         # right_layout.addWidget(self.save_button)
 
+        self.interval_save_timer = QTimer()
+        self.interval_save_timer.setInterval(2000)
+        self.interval_save_timer.start()
+
+        self.interval_save_timer.timeout.connect(self.save_snippet_changes)
+
         self.delete_button.clicked.connect(self.delete_snippet)
         self.add_button.clicked.connect(self.add_snippet)
 
@@ -643,31 +649,41 @@ class MainWindow(QWidget):
     def on_tree_item_clicked(self, index):
         self.handle_item_selection(index)
 
-    def handle_item_selection(self, index):
-        if self.text_edit.toPlainText() != self.content_loaded_from_json:
+    def save_snippet_changes(self):
+        changes = []
+        if self.content_loaded_from_json and self.text_edit.toPlainText() != self.content_loaded_from_json:
             # print('content changed, need to save!!!')
+            changes.append('content')
             self.save_snippet()
         # else:
         #     print('content not changed')
 
-        if self.title_lineedit.text() != self.title_loaded_from_json:
+        if self.title_loaded_from_json and self.title_lineedit.text() != self.title_loaded_from_json:
             # print('title changed, need to save!!!')
+            changes.append('title')
             self.save_snippet()
         # else:
         #     print('title not changed')
 
-        if self.type_combobox.currentText() != self.content_type_loaded_from_json:
+        if self.content_type_loaded_from_json and self.type_combobox.currentText() != self.content_type_loaded_from_json:
             # print('type_combobox changed, need to save!!!')
+            changes.append('content type')
             self.save_snippet()
         # else:
             # print('type_combobox not changed')
 
         previous_values = {placeholder: input_field.text() for placeholder, input_field in self.input_widgets.items()}
-        if previous_values != self.placeholder_dict_loaded_from_json:
+        if self.placeholder_dict_loaded_from_json and previous_values != self.placeholder_dict_loaded_from_json:
             # print('placeholder_dict_loaded_from_json changed, need to save!!!')
+            changes.append('placeholder')
             self.save_snippet()
         # else:
             # print('placeholder_dict_loaded_from_json not changed')
+        if len(changes) > 0:
+            print(f'changes={changes}')
+
+    def handle_item_selection(self, index):
+        self.save_snippet_changes()
 
         # title = self.tree_model.itemFromIndex(self.tree_model.index(index.row(), 0)).text()
         file_path_from_tree = self.tree_model.itemFromIndex(self.tree_model.index(index.row(), 2)).text()
