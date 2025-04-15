@@ -4,7 +4,7 @@ import os
 import json
 import datetime
 
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout, QGridLayout, QCheckBox, QHeaderView, QLabel, QTreeView, QSplitter, QComboBox, QAbstractItemView
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout, QGridLayout, QMessageBox, QCheckBox, QHeaderView, QLabel, QTreeView, QSplitter, QComboBox, QAbstractItemView
 from PyQt5.QtGui import QColor, QTextCharFormat, QFont, QSyntaxHighlighter, QStandardItemModel, QStandardItem, QIcon
 from PyQt5.QtCore import Qt, QItemSelectionModel, QItemSelection, QSettings, QRegularExpression, QSortFilterProxyModel, QModelIndex, QMimeData
 
@@ -299,6 +299,11 @@ class MainWindow(QWidget):
 
 
         # 添加搜索框
+        self.add_button = QPushButton("+")
+        self.add_button.setMaximumWidth(40)
+        self.delete_button = QPushButton("-")
+        self.delete_button.setMaximumWidth(40)
+
         self.search_box = MySearchComboBox(self)
         self.search_box.setPlaceholderText("Search in tree")
         self.search_box.currentTextChanged.connect(self.filter_tree_view_slot)
@@ -317,9 +322,11 @@ class MainWindow(QWidget):
         
         self.search_widget = QWidget()
         self.search_widget.setLayout(QGridLayout())
-        self.search_widget.layout().addWidget(self.search_box, 0, 0)
-        self.search_widget.layout().addWidget(self.regex_check_box, 0, 1)
-        self.search_widget.layout().addWidget(self.save_search_btn, 0, 2)
+        self.search_widget.layout().addWidget(self.add_button, 0, 0)
+        self.search_widget.layout().addWidget(self.delete_button, 0, 1)
+        self.search_widget.layout().addWidget(self.search_box, 0, 2)
+        self.search_widget.layout().addWidget(self.regex_check_box, 0, 3)
+        self.search_widget.layout().addWidget(self.save_search_btn, 0, 4)
         self.search_widget.layout().setContentsMargins(0, 0, 0, 0)
 
 
@@ -371,19 +378,8 @@ class MainWindow(QWidget):
         self.type_combobox.addItems(['Plain text', 'Python', 'C++'])
         self.type_combobox.currentTextChanged.connect(self.apply_highlighter)
 
-        # 新增删除和新增按钮
-        self.delete_button = QPushButton("-")
-        self.add_button = QPushButton("+")
-        self.delete_button.setMaximumWidth(40)
-        self.add_button.setMaximumWidth(40)
-
-        self.delete_button.clicked.connect(self.delete_snippet)
-        self.add_button.clicked.connect(self.add_snippet)
-
         info_layout.addWidget(self.title_lineedit)
         info_layout.addWidget(self.type_combobox)
-        info_layout.addWidget(self.add_button)
-        info_layout.addWidget(self.delete_button)
 
         right_layout.addLayout(info_layout)
 
@@ -421,6 +417,10 @@ class MainWindow(QWidget):
         # self.save_button = QPushButton("Save")
         # self.save_button.clicked.connect(self.save_snippet)
         # right_layout.addWidget(self.save_button)
+
+        self.delete_button.clicked.connect(self.delete_snippet)
+        self.add_button.clicked.connect(self.add_snippet)
+
 
         right_widget.setLayout(right_layout)
         self.hor_splitter.addWidget(right_widget)
@@ -646,6 +646,7 @@ class MainWindow(QWidget):
 
         for placeholder in unique_placeholders:
             label = QLabel(placeholder)
+            label.setStyleSheet('QLabel { color: red; font-weight: bold; padding: 5px; }')
             # label.setReadOnly(True)
             input_field = QLineEdit()
             input_field.textChanged.connect(self.input_field_changed)
@@ -657,7 +658,7 @@ class MainWindow(QWidget):
             self.input_widgets[placeholder] = input_field
 
             hbox = QHBoxLayout()
-            label.setMinimumWidth(80)
+            label.setMinimumWidth(150)
             label.setMaximumWidth(200)
             hbox.addWidget(label)
             hbox.addWidget(input_field)
@@ -755,6 +756,11 @@ class MainWindow(QWidget):
             self.plain_text_highlighter_replaced.setDocument(self.text_edit_replaced.document())
 
     def delete_snippet(self):
+        reply = QMessageBox.question(self, 'Confirm Deletion', 'Are you sure you want to delete this item?',
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.No:
+            return
+        
         if self.current_snippet_file:
             try:
                 os.remove(self.current_snippet_file)
