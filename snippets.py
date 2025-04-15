@@ -756,6 +756,21 @@ class MainWindow(QWidget):
                     timestamp_item.setText(timestamp)
                 break
 
+    def add_item(self, file_path, snippet_type, title, timestamp):
+        # 创建新的 QStandardItem 实例
+        title_item = QStandardItem(title)
+        type_item = QStandardItem(snippet_type)
+        file_path_item = QStandardItem(file_path)
+        timestamp_item = QStandardItem(timestamp)
+
+        # 在 tree_model 中添加新行
+        row = [title_item, type_item, file_path_item, timestamp_item]
+        self.tree_model.appendRow(row)
+
+        # 获取新添加项的索引
+        index = self.tree_model.index(self.tree_model.rowCount() - 1, 0)
+
+        return index
 
     def del_item(self, file_path):
         # 遍历 tree_model 的所有行
@@ -790,16 +805,6 @@ class MainWindow(QWidget):
             try:
                 os.remove(self.current_snippet_file)
                 self.del_item(self.current_snippet_file)
-
-                # self.title_lineedit.clear()
-                # self.type_combobox.setCurrentIndex(0)
-                # self.text_edit.clear()
-                # self.update_input_layout()
-                # self.current_snippet_file = None
-
-                # index = self.tree_model.index(0, 0)
-                # self.select_tree_item(index)
-                # self.on_tree_item_clicked(index)
                 
             except Exception as e:
                 print(f"Error deleting snippet: {e}")
@@ -829,15 +834,11 @@ class MainWindow(QWidget):
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(new_snippet, f, ensure_ascii=False, indent=4)
-            self.load_snippets()
-            # 根据 timestamp 匹配新添加的代码片段
-            for i in range(self.tree_model.rowCount()):
-                timestamp_item = self.tree_model.item(i, 3)
-                if timestamp_item.text() == timestamp:
-                    index = self.tree_model.index(i, 0)
-                    self.select_tree_item(index)
-                    self.on_tree_item_clicked(index)
-                    break
+
+            index = self.add_item(file_path, new_type, new_title, timestamp)
+            self.select_tree_item(index)
+            self.on_tree_item_clicked(index)
+
         except Exception as e:
             print(f"Error adding snippet: {e}")
 
