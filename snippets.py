@@ -418,9 +418,9 @@ class MainWindow(QWidget):
         # self.replace_button.clicked.connect(self.replace_placeholders)
         # right_layout.addWidget(self.replace_button)
 
-        self.save_button = QPushButton("Save")
-        self.save_button.clicked.connect(self.save_snippet)
-        right_layout.addWidget(self.save_button)
+        # self.save_button = QPushButton("Save")
+        # self.save_button.clicked.connect(self.save_snippet)
+        # right_layout.addWidget(self.save_button)
 
         right_widget.setLayout(right_layout)
         self.hor_splitter.addWidget(right_widget)
