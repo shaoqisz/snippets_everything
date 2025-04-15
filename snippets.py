@@ -618,6 +618,7 @@ class MainWindow(QWidget):
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
                         snippet = json.load(f)
+                        snippet['file_path'] = file_path
                         snippets.append(snippet)
                 except Exception as e:
                     print(f"Error loading {filename}: {e}")
@@ -684,11 +685,49 @@ class MainWindow(QWidget):
         if len(changes) > 0:
             print(f'changes={changes}')
 
+    def get_items_1_2_3(self, item, index):
+        item_column_1 = None
+        item_column_2 = None
+        item_column_3 = None
+
+        if item:
+            if index.column() == 0:  # 点击的是第一列
+                item_column_1 = item
+                parent_item = item.parent()
+                if parent_item is None:
+                    parent_item = self.tree_model.invisibleRootItem()
+
+                item_column_2 = parent_item.child(item.row(), 1)
+                item_column_3 = parent_item.child(item.row(), 2)
+
+            elif index.column() == 1:  # 点击的是第二列
+                item_column_2 = item
+                parent_item = item.parent()
+                if parent_item is None:
+                    parent_item = self.tree_model.invisibleRootItem()
+                item_column_1 = parent_item.child(item.row(), 0)
+                item_column_3 = parent_item.child(item.row(), 2)
+
+            elif index.column() == 2:  # 点击的是第三列
+                item_column_3 = item
+                parent_item = item.parent()
+                if parent_item is None:
+                    parent_item = self.tree_model.invisibleRootItem()
+                item_column_1 = parent_item.child(item.row(), 0)
+                item_column_2 = parent_item.child(item.row(), 1)
+
+        return item_column_1, item_column_2, item_column_3
+    
     def handle_item_selection(self, index):
         self.save_snippet_changes()
 
-        # title = self.tree_model.itemFromIndex(self.tree_model.index(index.row(), 0)).text()
-        file_path_from_tree = self.tree_model.itemFromIndex(self.tree_model.index(index.row(), 2)).text()
+        item = self.tree_model.itemFromIndex(self.proxy_model.mapToSource(index))
+        if item is None:
+            return
+
+        _, _, file_path_from_tree = self.get_items_1_2_3(item, index)
+        if file_path_from_tree is None:
+            return
 
         for filename in os.listdir(self.data_dir):
             if filename.endswith('.json'):
@@ -698,9 +737,9 @@ class MainWindow(QWidget):
                     with open(file_path, 'r', encoding='utf-8') as f:
                         snippet = json.load(f)
                         
-                        if snippet.get('file_path') == file_path_from_tree:
+                        if file_path == file_path_from_tree.text():
+                            print(f'file_path={file_path}')
 
-                            # print(f'file_path={file_path} {snippet}')
                             self.title_loaded_from_json = snippet.get('title', '')
                             self.title_lineedit.setText(self.title_loaded_from_json)
 
@@ -729,7 +768,7 @@ class MainWindow(QWidget):
                             self.replace_placeholders()
                             
                             break
-   
+
                 
                 except Exception as e:
                     print(f"Error loading {filename}: {e}")
@@ -804,7 +843,7 @@ class MainWindow(QWidget):
             for placeholder, input_field in self.input_widgets.items():
                 replacement = input_field.text()
                 if replacement:
-                    code = code.replace(placeholder, f'<span style="color: red;">{replacement}</span>')
+                    code = code.replace(placeholder, f'<span style="color: black; font-weight: bold;">{replacement}</span>')
 
             replaced_code = (f'<p style="white-space: pre-wrap; color: green;">{code}</p>')
             self.text_edit_replaced.setHtml(replaced_code)
@@ -839,7 +878,6 @@ class MainWindow(QWidget):
             'title': title,
             'content': content,
             'timestamp': timestamp,
-            'file_path': self.current_snippet_file,
             **placeholder_dict
         }
 
@@ -946,8 +984,7 @@ class MainWindow(QWidget):
             'type': new_type,
             'title': new_title,
             'content': new_content,
-            'timestamp': timestamp,
-            'file_path': file_path
+            'timestamp': timestamp
         }
 
         try:
