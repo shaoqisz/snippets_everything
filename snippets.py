@@ -658,6 +658,7 @@ class MainWindow(QWidget):
             # print('content changed, need to save!!!')
             changes.append('content')
             self.save_snippet()
+            self.content_loaded_from_json = self.text_edit.toPlainText()
         # else:
         #     print('content not changed')
 
@@ -665,6 +666,7 @@ class MainWindow(QWidget):
             # print('title changed, need to save!!!')
             changes.append('title')
             self.save_snippet()
+            self.title_loaded_from_json = self.title_lineedit.text()
         # else:
         #     print('title not changed')
 
@@ -672,6 +674,7 @@ class MainWindow(QWidget):
             # print('type_combobox changed, need to save!!!')
             changes.append('content type')
             self.save_snippet()
+            self.content_type_loaded_from_json = self.type_combobox.currentText()
         # else:
             # print('type_combobox not changed')
 
@@ -680,6 +683,7 @@ class MainWindow(QWidget):
             # print('placeholder_dict_loaded_from_json changed, need to save!!!')
             changes.append('placeholder')
             self.save_snippet()
+            self.placeholder_dict_loaded_from_json = previous_values
         # else:
             # print('placeholder_dict_loaded_from_json not changed')
         if len(changes) > 0:
