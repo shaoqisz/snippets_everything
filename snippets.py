@@ -276,12 +276,10 @@ class PlainTextEdit(QTextEdit):
             self.insertPlainText(text)
 
     def keyPressEvent(self, event: QKeyEvent):
-        # print(f'event.key()={event.key()}')
         cursor = self.textCursor()
         spaces = ' ' * 4
-
         if event.key() == Qt.Key_Backtab:
-            print(f'shift+tab')
+            scroll_value = self.verticalScrollBar().value()
             if cursor.hasSelection():
                 start_position = cursor.selectionStart()
                 end_position = cursor.selectionEnd()
@@ -307,7 +305,8 @@ class PlainTextEdit(QTextEdit):
                 self.setTextCursor(new_cursor)
                 cursor.endEditBlock()
             else:
-                cursor = self.textCursor()
+                original_position = cursor.position()
+                start_position = cursor.selectionStart()
                 cursor.movePosition(QTextCursor.StartOfLine)
                 line_text = cursor.block().text()
                 space_count = count_leading_spaces(line_text)
@@ -322,20 +321,19 @@ class PlainTextEdit(QTextEdit):
                     cursor.removeSelectedText()
                     cursor.insertText(new_text)
 
-        elif event.key() == Qt.Key_Tab: 
+                new_cursor = self.textCursor()
+                new_cursor.setPosition(original_position-min(space_count, 4), QTextCursor.MoveAnchor)
+                self.setTextCursor(new_cursor)
+
+            self.verticalScrollBar().setValue(scroll_value)
+        elif event.key() == Qt.Key_Tab:
+            scroll_value = self.verticalScrollBar().value()
             if cursor.hasSelection():
                 start_position = cursor.selectionStart()  # 记录选中区域起始位置
                 end_position = cursor.selectionEnd()  # 记录选中区域结束位置
-                # print(f'text={repr(self.toPlainText())}')
-
                 selected_text = cursor.selectedText()
-                # print(f'selected_text={selected_text}')
-                # lines = selected_text.split('\n')
                 lines = re.split(r'[\n\u2029]', selected_text)
-                # print(f'lines={lines}')
-                # 定义要添加的空格数量，这里设为 4 个
                 new_text = '\n'.join([spaces + line for line in lines])
-                print(f'new_text={new_text}')
                 cursor.beginEditBlock()
                 cursor.removeSelectedText()
                 cursor.insertText(new_text)
@@ -349,6 +347,8 @@ class PlainTextEdit(QTextEdit):
                 self.setTextCursor(new_cursor)
             else:
                 cursor.insertText(spaces)
+
+            self.verticalScrollBar().setValue(scroll_value)
         else:
             super().keyPressEvent(event)
 
