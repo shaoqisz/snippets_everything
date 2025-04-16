@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTextEdit, QLine
 from PyQt5.QtGui import QColor, QTextCharFormat, QFont, QSyntaxHighlighter, QStandardItemModel, QStandardItem, QIcon, QKeyEvent, QTextCursor
 from PyQt5.QtCore import Qt, QItemSelectionModel, QItemSelection, QSettings, QRegularExpression, QSortFilterProxyModel, QModelIndex, QMimeData, QTimer
 
+from text_edit_search import TextEditSearch
 
 def format(color, style=''):
     _color = QColor()
@@ -491,14 +492,18 @@ class MainWindow(QWidget):
         right_layout.addLayout(self.input_layout)
 
 
-        self.text_edit = PlainTextEdit()
+        self.text_edit = PlainTextEdit(self)
         font = QFont("Consolas")  # 或 "Courier New", "Menlo"
         font.setFixedPitch(True)  # 强制等宽
         self.text_edit.setFont(font)
 
-        self.text_edit_replaced = QTextEdit()
+        self.text_edit_search = TextEditSearch(self.text_edit)
+
+        self.text_edit_replaced = QTextEdit(self)
         self.text_edit_replaced.setFont(font)
         self.text_edit_replaced.setReadOnly(True)
+        self.text_edit_replaced_search = TextEditSearch(self.text_edit_replaced)
+
 
         self.python_highlighter = PythonHighlighter(self.text_edit.document())
         self.cpp_highlighter = CppHighlighter(self.text_edit.document())
@@ -513,8 +518,8 @@ class MainWindow(QWidget):
         self.right_vert_splitter = QSplitter(Qt.Vertical, self)
         self.right_vert_splitter.setObjectName("right_vert_splitter")
 
-        self.right_vert_splitter.addWidget(self.text_edit)
-        self.right_vert_splitter.addWidget(self.text_edit_replaced)
+        self.right_vert_splitter.addWidget(self.text_edit_search)
+        self.right_vert_splitter.addWidget(self.text_edit_replaced_search)
 
         right_layout.addWidget(self.right_vert_splitter)
 
