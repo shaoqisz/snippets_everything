@@ -30,7 +30,7 @@ STYLES = {
     'keyword': format([200, 120, 50], 'bold'),
     'operator': format([150, 150, 150]),
     'brace': format('darkGray'),
-    'defclass': format([220, 220, 250], 'bold'),
+    'defclass': format([128, 0, 128], 'bold'),
     'string': format([20, 110, 100]),
     'comment': format([70, 70, 70], 'italic'),
     'self': format([150, 85, 140], 'italic'),
@@ -492,7 +492,12 @@ class MainWindow(QWidget):
 
 
         self.text_edit = PlainTextEdit()
+        font = QFont("Consolas")  # 或 "Courier New", "Menlo"
+        font.setFixedPitch(True)  # 强制等宽
+        self.text_edit.setFont(font)
+
         self.text_edit_replaced = QTextEdit()
+        self.text_edit_replaced.setFont(font)
         self.text_edit_replaced.setReadOnly(True)
 
         self.python_highlighter = PythonHighlighter(self.text_edit.document())
