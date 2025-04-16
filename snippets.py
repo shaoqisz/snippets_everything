@@ -542,9 +542,11 @@ class MainWindow(QWidget):
         self.load_snippets()
         self.current_snippet_file = None
 
-        index = self.tree_model.index(0, 0)
-        self.select_tree_item(index)
-        self.on_tree_item_clicked(index)
+        if self.proxy_model.rowCount() > 0:
+            first_row_index = self.proxy_model.index(0, 0)
+            self.select_tree_item_by_proxy_index(first_row_index)
+            self.handle_item_selection_by_proxy_index(first_row_index)
+
 
         app_name = 'Snippets Everything'
         self.setWindowTitle(app_name)
@@ -652,28 +654,44 @@ class MainWindow(QWidget):
             
             self.tree_model.appendRow([title_item, type_item, file_path_item, timestamp_item])
 
-        self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        # self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         # self.tree.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+
+        # self.tree.setColumnWidth(0, 250)
 
     def on_selection_changed(self, selected, deselected):
         if selected.indexes():
             index = selected.indexes()[0]
-            self.handle_item_selection(index)
+
+            item = self.tree_model.itemFromIndex(self.proxy_model.mapToSource(index))
+            if item is None:
+                return
+            _, _, file_path_from_tree = self.get_items_1_2_3(item, index)
+            if file_path_from_tree is None:
+                return
+            self.handle_item_selection_by_file_path(file_path_from_tree)
 
     def on_tree_item_clicked(self, index):
-        self.handle_item_selection(index)
+        item = self.tree_model.itemFromIndex(self.proxy_model.mapToSource(index))
+        if item is None:
+            return
+        _, _, file_path_from_tree = self.get_items_1_2_3(item, index)
+        if file_path_from_tree is None:
+            return
+        self.handle_item_selection_by_file_path(file_path_from_tree)
 
     def save_snippet_changes(self):
         changes = []
-        if self.content_loaded_from_json and self.text_edit.toPlainText() != self.content_loaded_from_json:
+        if self.content_loaded_from_json is not None and self.text_edit.toPlainText() != self.content_loaded_from_json:
             # print('content changed, need to save!!!')
             changes.append('content')
             self.save_snippet()
             self.content_loaded_from_json = self.text_edit.toPlainText()
         # else:
+        #     print(f'content_loaded_from_json={self.content_loaded_from_json}')
         #     print('content not changed')
 
-        if self.title_loaded_from_json and self.title_lineedit.text() != self.title_loaded_from_json:
+        if self.title_loaded_from_json is not None and self.title_lineedit.text() != self.title_loaded_from_json:
             # print('title changed, need to save!!!')
             changes.append('title')
             self.save_snippet()
@@ -681,7 +699,7 @@ class MainWindow(QWidget):
         # else:
         #     print('title not changed')
 
-        if self.content_type_loaded_from_json and self.type_combobox.currentText() != self.content_type_loaded_from_json:
+        if self.content_type_loaded_from_json is not None and self.type_combobox.currentText() != self.content_type_loaded_from_json:
             # print('type_combobox changed, need to save!!!')
             changes.append('content type')
             self.save_snippet()
@@ -690,7 +708,7 @@ class MainWindow(QWidget):
             # print('type_combobox not changed')
 
         previous_values = {placeholder: input_field.text() for placeholder, input_field in self.input_widgets.items()}
-        if self.placeholder_dict_loaded_from_json and previous_values != self.placeholder_dict_loaded_from_json:
+        if self.placeholder_dict_loaded_from_json is not None and previous_values != self.placeholder_dict_loaded_from_json:
             # print('placeholder_dict_loaded_from_json changed, need to save!!!')
             changes.append('placeholder')
             self.save_snippet()
@@ -733,8 +751,7 @@ class MainWindow(QWidget):
 
         return item_column_1, item_column_2, item_column_3
     
-    def handle_item_selection(self, index):
-        self.save_snippet_changes()
+    def handle_item_selection_by_proxy_index(self, index):
 
         item = self.tree_model.itemFromIndex(self.proxy_model.mapToSource(index))
         if item is None:
@@ -743,6 +760,12 @@ class MainWindow(QWidget):
         _, _, file_path_from_tree = self.get_items_1_2_3(item, index)
         if file_path_from_tree is None:
             return
+
+        self.handle_item_selection_by_file_path(file_path_from_tree)
+
+
+    def handle_item_selection_by_file_path(self, file_path_from_tree):
+        self.save_snippet_changes()
 
         for filename in os.listdir(self.data_dir):
             if filename.endswith('.json'):
@@ -753,10 +776,10 @@ class MainWindow(QWidget):
                         snippet = json.load(f)
                         
                         if file_path == file_path_from_tree.text():
-                            print(f'file_path={file_path}')
 
                             self.title_loaded_from_json = snippet.get('title', '')
                             self.title_lineedit.setText(self.title_loaded_from_json)
+                            print(f'select => {file_path} title={self.title_loaded_from_json}')
 
                             content_type = snippet.get('type', 'Plain text')
                             type_index = self.type_combobox.findText(content_type)
@@ -872,7 +895,7 @@ class MainWindow(QWidget):
 
     def save_snippet(self):
         if not self.current_snippet_file:
-            # print("No snippet is currently selected.")
+            print("No snippet is currently selected.")
             return
         
         title = self.title_lineedit.text()
@@ -899,6 +922,8 @@ class MainWindow(QWidget):
         try:
             with open(self.current_snippet_file, 'w', encoding='utf-8') as f:
                 json.dump(snippet, f, ensure_ascii=False, indent=4)
+            
+            print(f"save and update item => {self.current_snippet_file} title={title}")
 
             self.change_item(self.current_snippet_file, snippet_type, title, timestamp)
         
@@ -939,10 +964,13 @@ class MainWindow(QWidget):
         row = [title_item, type_item, file_path_item, timestamp_item]
         self.tree_model.appendRow(row)
 
-        # 获取新添加项的索引
-        index = self.tree_model.index(self.tree_model.rowCount() - 1, 0)
+        # 获取新添加项的源模型索引
+        source_index = self.tree_model.index(self.tree_model.rowCount() - 1, 0)
 
-        return index
+        # 将源模型索引转换为代理模型索引
+        proxy_index = self.proxy_model.mapFromSource(source_index)
+
+        return proxy_index
 
     def del_item(self, file_path):
         # 遍历 tree_model 的所有行
@@ -1006,16 +1034,42 @@ class MainWindow(QWidget):
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(new_snippet, f, ensure_ascii=False, indent=4)
 
-            index = self.add_item(file_path, new_type, new_title, timestamp)
-            self.select_tree_item(index)
-            self.on_tree_item_clicked(index)
+            proxy_index = self.add_item(file_path, new_type, new_title, timestamp)
+            self.select_tree_item_by_proxy_index(proxy_index)
+            self.handle_item_selection_by_proxy_index(proxy_index)
 
         except Exception as e:
             print(f"Error adding snippet: {e}")
 
-    def select_tree_item(self, index):
-        start_index = self.tree_model.index(index.row(), 0)
-        end_index = self.tree_model.index(index.row(), self.tree_model.columnCount() - 1)
+    # def select_tree_item_by_proxy(self, index):
+    #     print(f'select_tree_item')
+    #     # 将代理模型的索引转换为源模型的索引
+    #     source_index = self.proxy_model.mapToSource(index)
+    #     start_index = self.tree_model.index(source_index.row(), 0)
+    #     end_index = self.tree_model.index(source_index.row(), self.tree_model.columnCount() - 1)
+    #     selection = QItemSelection(start_index, end_index)
+    #     # 将源模型的选择范围转换为代理模型的选择范围
+    #     proxy_selection = QItemSelection()
+    #     for range in selection:
+    #         top_left_index = QModelIndex(range.topLeft())
+    #         bottom_right_index = QModelIndex(range.bottomRight())
+    #         proxy_top_left = self.proxy_model.mapFromSource(top_left_index)
+    #         proxy_bottom_right = self.proxy_model.mapFromSource(bottom_right_index)
+    #         proxy_selection.select(proxy_top_left, proxy_bottom_right)
+    #     self.tree.selectionModel().select(proxy_selection, QItemSelectionModel.SelectCurrent)
+    #     print(f'select_tree_item done')
+
+    # def select_first_row(self):
+    #     if self.proxy_model.rowCount() > 0:
+    #         # 获取代理模型中第一行第一列的索引
+    #         first_row_index = self.proxy_model.index(0, 0)
+    #         self.select_tree_item(first_row_index)
+
+
+    def select_tree_item_by_proxy_index(self, index):
+        self.tree.selectionModel().clearSelection()
+        start_index = self.proxy_model.index(index.row(), 0)
+        end_index = self.proxy_model.index(index.row(), self.proxy_model.columnCount() - 1)
         selection = QItemSelection(start_index, end_index)
         self.tree.selectionModel().select(selection, QItemSelectionModel.SelectCurrent)
 
