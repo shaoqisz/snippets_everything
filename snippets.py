@@ -892,8 +892,8 @@ class MainWindow(QWidget):
             self.input_widgets[placeholder] = input_field
 
             hbox = QHBoxLayout()
-            label.setMinimumWidth(150)
-            label.setMaximumWidth(200)
+            label.setMinimumWidth(250)
+            label.setMaximumWidth(250)
             hbox.addWidget(label)
             hbox.addWidget(input_field)
             self.input_layout.addLayout(hbox)
@@ -942,9 +942,10 @@ class MainWindow(QWidget):
         content = self.text_edit.toPlainText()
         placeholders = re.findall(r'\$\w+', content)
 
-
         now = datetime.datetime.now()
         timestamp = now.strftime("%Y-%m-%d %H:%M:%S.%f")
+        # print(f'timestamp={timestamp}')
+        timestamp = timestamp[:-3]
 
         # 构建包含占位符值的字典
         placeholder_dict = {placeholder: self.input_widgets[placeholder].text() if placeholder in self.input_widgets else '' for placeholder in placeholders}
@@ -1056,7 +1057,9 @@ class MainWindow(QWidget):
 
         now = datetime.datetime.now()
         timestamp = now.strftime("%Y-%m-%d %H:%M:%S.%f")
-
+        # print(f'timestamp={timestamp}')
+        timestamp = timestamp[:-3]
+        
         file_name_ts = now.strftime("%Y%m%d%H%M%S%f")
         file_name = f"snippet_{file_name_ts}.json"
         file_path = os.path.join(self.data_dir, file_name)
