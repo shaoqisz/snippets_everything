@@ -441,6 +441,7 @@ class MainWindow(QWidget):
 
         # 左侧 TreeView
         self.tree = QTreeView()
+        self.tree.setSortingEnabled(True)  # 启用排序功能
         self.tree_model = QStandardItemModel()
         self.tree_model.setHorizontalHeaderLabels(['Title', 'Type', 'Created Time'])
 
@@ -551,7 +552,6 @@ class MainWindow(QWidget):
         self.setWindowIcon(QIcon('pen.ico'))
         self.settings = QSettings("Philips", app_name)
 
-        self.setWindowTitle(app_name)
         self.load_settings()
 
     def closeEvent(self, event):
@@ -570,6 +570,13 @@ class MainWindow(QWidget):
         self.settings.setValue(self.right_vert_splitter.objectName(), self.right_vert_splitter.saveState())
 
 
+        column_count = self.tree_model.columnCount()
+        for col in range(column_count):
+            width = self.tree.columnWidth(col)
+            self.settings.setValue(f"tree_column_width/{col}", width)
+
+
+
     def load_settings(self):
         # geometry
         geometry = self.settings.value("geometry")
@@ -585,6 +592,10 @@ class MainWindow(QWidget):
         if splitter_state:
             self.right_vert_splitter.restoreState(splitter_state)
 
+        column_count = self.tree_model.columnCount()
+        for col in range(column_count):
+            width = self.settings.value(f"tree_column_width/{col}", defaultValue=100, type=int)
+            self.tree.setColumnWidth(col, width)
 
     def filter_tree_view_slot(self, text):
         if self.regex_check_box.isChecked():
