@@ -483,9 +483,8 @@ class MainWindow(QWidget):
         self.tree.setSelectionMode(QTreeView.SingleSelection)  # 设置选择模式为单选
         self.tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
 
-        self.tree.clicked.connect(self.on_tree_item_clicked)
+        # self.tree.clicked.connect(self.on_tree_item_clicked)
         self.tree.selectionModel().selectionChanged.connect(self.on_selection_changed)
-
 
         widget_with_tree_search = QWidget()
         widget_with_tree_search.setLayout(QVBoxLayout())
@@ -583,7 +582,7 @@ class MainWindow(QWidget):
         if self.proxy_model.rowCount() > 0:
             first_row_index = self.proxy_model.index(0, 0)
             self.select_tree_item_by_proxy_index(first_row_index)
-            self.handle_item_selection_by_proxy_index(first_row_index)
+            # self.handle_item_selection_by_proxy_index(first_row_index)
 
 
         app_name = 'Snippets Everything'
@@ -709,14 +708,14 @@ class MainWindow(QWidget):
                 return
             self.handle_item_selection_by_file_path(file_path_from_tree)
 
-    def on_tree_item_clicked(self, index):
-        item = self.tree_model.itemFromIndex(self.proxy_model.mapToSource(index))
-        if item is None:
-            return
-        _, _, file_path_from_tree = self.get_items_1_2_3(item, index)
-        if file_path_from_tree is None:
-            return
-        self.handle_item_selection_by_file_path(file_path_from_tree)
+    # def on_tree_item_clicked(self, index):
+    #     item = self.tree_model.itemFromIndex(self.proxy_model.mapToSource(index))
+    #     if item is None:
+    #         return
+    #     _, _, file_path_from_tree = self.get_items_1_2_3(item, index)
+    #     if file_path_from_tree is None:
+    #         return
+    #     self.handle_item_selection_by_file_path(file_path_from_tree)
 
     def save_snippet_changes(self):
         changes = []
@@ -1077,7 +1076,7 @@ class MainWindow(QWidget):
 
             proxy_index = self.add_item(file_path, new_type, new_title, timestamp)
             self.select_tree_item_by_proxy_index(proxy_index)
-            self.handle_item_selection_by_proxy_index(proxy_index)
+            # self.handle_item_selection_by_proxy_index(proxy_index)
 
         except Exception as e:
             print(f"Error adding snippet: {e}")
