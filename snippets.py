@@ -4,11 +4,34 @@ import os
 import json
 import datetime
 
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout, QGridLayout, QMessageBox, QCheckBox, QHeaderView, QLabel, QTreeView, QSplitter, QComboBox, QAbstractItemView
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout, QGridLayout, QMessageBox, QAction, QCheckBox, QHeaderView, QLabel, QTreeView, QSplitter, QComboBox, QAbstractItemView
 from PyQt5.QtGui import QColor, QTextCharFormat, QFont, QSyntaxHighlighter, QStandardItemModel, QStandardItem, QIcon, QKeyEvent, QTextCursor
 from PyQt5.QtCore import Qt, QItemSelectionModel, QItemSelection, QSettings, QRegularExpression, QSortFilterProxyModel, QModelIndex, QMimeData, QTimer
 
 from text_edit_search import TextEditSearch
+
+
+class LineEditPasteDate(QLineEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def contextMenuEvent(self, event):
+        # 创建默认的上下文菜单
+        menu = self.createStandardContextMenu()
+
+        menu.addSeparator()
+
+        # 添加一个新的动作，用于粘贴当前日期
+        paste_date_action = QAction("Paste Current Date", self)
+        paste_date_action.triggered.connect(self.paste_current_date)
+        menu.addAction(paste_date_action)
+
+        # 在右键点击位置显示菜单
+        menu.exec_(event.globalPos())
+
+    def paste_current_date(self):
+        current_date = datetime.datetime.now().strftime("%d-%b-%Y")
+        self.insert(current_date)
 
 def format(color, style=''):
     _color = QColor()
@@ -59,7 +82,9 @@ class PythonHighlighter(QSyntaxHighlighter):
         # In-place
         '\+=', '-=', '\*=', '/=', '\%=',
         # Bitwise
-        '\^', '\|', '\&', '\~', '>>', '<<',
+        '\^', '\|', '\&', '\~', '>>', '<<', 
+        # other
+        '#'
     ]
 
     braces = [
@@ -123,7 +148,7 @@ class CppHighlighter(QSyntaxHighlighter):
         'static_assert', 'static_cast', 'struct', 'switch', 'synchronized',
         'template', 'this', 'thread_local', 'throw', 'true', 'try', 'typedef',
         'typeid', 'typename', 'union', 'unsigned', 'using', 'virtual', 'void',
-        'volatile', 'wchar_t', 'while', 'xor', 'xor_eq',
+        'volatile', 'wchar_t', 'while', 'xor', 'xor_eq', 'include'
     ]
 
     operators = [
@@ -162,6 +187,7 @@ class CppHighlighter(QSyntaxHighlighter):
             (r'\b[+-]?[0-9]+[lL]?\b', 0, STYLES['numbers']),
             (r'\b[+-]?0[xX][0-9A-Fa-f]+[lL]?\b', 0, STYLES['numbers']),
             (r'\b[+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\b', 0, STYLES['numbers']),
+            (r'\$\w+', 0, STYLES['placeholder'])
         ]
 
         self.rules = [(re.compile(pat), index, fmt)
@@ -442,6 +468,8 @@ class MainWindow(QWidget):
 
         # 左侧 TreeView
         self.tree = QTreeView()
+        self.tree.setHorizontalScrollMode(QTreeView.ScrollPerPixel)  # 设置水平滚动策略
+        self.tree.setAutoScroll(False)
         self.tree.setSortingEnabled(True)  # 启用排序功能
         self.tree_model = QStandardItemModel()
         self.tree_model.setHorizontalHeaderLabels(['Title', 'Type', 'Created Time'])
@@ -854,7 +882,7 @@ class MainWindow(QWidget):
             label = QLabel(placeholder)
             label.setStyleSheet('QLabel { color: red; font-weight: bold; padding: 5px; }')
             # label.setReadOnly(True)
-            input_field = QLineEdit()
+            input_field = LineEditPasteDate()
             input_field.textChanged.connect(self.input_field_changed)
             # 恢复之前输入框的值
             if placeholder in previous_values:
