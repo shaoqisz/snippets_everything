@@ -423,7 +423,6 @@ class MainWindow(QWidget):
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
 
-        self.input_widgets = {}
 
 
         # 添加搜索框
@@ -513,7 +512,9 @@ class MainWindow(QWidget):
 
         right_layout.addLayout(info_layout)
 
-        self.input_layout = QVBoxLayout()
+        self.input_widgets = {}
+        self.previous_placeholders = []
+        self.input_layout = QGridLayout()
         self.input_layout.setContentsMargins(0,0,0,0)
         self.input_layout.setSpacing(2)
         right_layout.addLayout(self.input_layout)
@@ -853,6 +854,23 @@ class MainWindow(QWidget):
         # 保存之前输入框的值
         previous_values = {placeholder: input_field.text() for placeholder, input_field in self.input_widgets.items()}
 
+        code = self.text_edit.toPlainText()
+        placeholders = re.findall(r'\$\w+', code)
+        unique_placeholders = []
+        for placeholder in placeholders:
+            if placeholder not in unique_placeholders:
+                unique_placeholders.append(placeholder)
+
+        # 比较当前占位符和之前的占位符
+        if unique_placeholders == self.previous_placeholders:
+            # 占位符没有变化，恢复之前的值
+            for placeholder, input_field in self.input_widgets.items():
+                if placeholder in previous_values:
+                    input_field.setText(previous_values[placeholder])
+            self.replace_placeholders()
+            return
+
+        # 占位符有变化，更新布局
         # 清空现有的输入框及布局
         while self.input_layout.count():
             item = self.input_layout.takeAt(0)
@@ -868,35 +886,25 @@ class MainWindow(QWidget):
                         if sub_widget:
                             sub_widget.deleteLater()
 
+        self.input_layout.update()
         self.input_widgets = {}
-        code = self.text_edit.toPlainText()
-        placeholders = re.findall(r'\$\w+', code)
 
-        unique_placeholders = []
-        for placeholder in placeholders:
-            if placeholder not in unique_placeholders:
-                unique_placeholders.append(placeholder)
+        if unique_placeholders:
+            for row, placeholder in enumerate(unique_placeholders):
+                label = QLabel(placeholder)
+                label.setStyleSheet('QLabel { color: red; font-weight: bold; padding: 5px; }')
+                input_field = LineEditPasteDate()
+                input_field.textChanged.connect(self.input_field_changed)
+                # 恢复之前输入框的值
+                if placeholder in previous_values:
+                    input_field.setText(previous_values[placeholder])
 
-        for placeholder in unique_placeholders:
-            label = QLabel(placeholder)
-            label.setStyleSheet('QLabel { color: red; font-weight: bold; padding: 5px; }')
-            # label.setReadOnly(True)
-            input_field = LineEditPasteDate()
-            input_field.textChanged.connect(self.input_field_changed)
-            # 恢复之前输入框的值
-            if placeholder in previous_values:
-                input_field.setText(previous_values[placeholder])
+                self.input_widgets[placeholder] = input_field
 
-            # print(f'placeholder={placeholder} input_field={input_field}')
-            self.input_widgets[placeholder] = input_field
+                self.input_layout.addWidget(label, row, 0)
+                self.input_layout.addWidget(input_field, row, 1)
 
-            hbox = QHBoxLayout()
-            label.setMinimumWidth(250)
-            label.setMaximumWidth(250)
-            hbox.addWidget(label)
-            hbox.addWidget(input_field)
-            self.input_layout.addLayout(hbox)
-
+        self.previous_placeholders = unique_placeholders
         self.replace_placeholders()
 
     def text_edit_changed(self):
