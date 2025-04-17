@@ -4,8 +4,8 @@ import os
 import json
 import datetime
 
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout, QGridLayout, QMessageBox, QAction, QCheckBox, QHeaderView, QLabel, QTreeView, QSplitter, QComboBox, QAbstractItemView
-from PyQt5.QtGui import QColor, QTextCharFormat, QFont, QSyntaxHighlighter, QStandardItemModel, QStandardItem, QIcon, QKeyEvent, QTextCursor
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTextEdit, QShortcut, QLineEdit, QPushButton, QHBoxLayout, QGridLayout, QMessageBox, QAction, QCheckBox, QHeaderView, QLabel, QTreeView, QSplitter, QComboBox, QAbstractItemView
+from PyQt5.QtGui import QColor, QTextCharFormat, QFont, QSyntaxHighlighter, QKeySequence, QStandardItemModel, QStandardItem, QIcon, QKeyEvent, QTextCursor
 from PyQt5.QtCore import Qt, QItemSelectionModel, QItemSelection, QSettings, QRegularExpression, QSortFilterProxyModel, QModelIndex, QMimeData, QTimer
 
 from text_edit_search import TextEditSearch
@@ -585,6 +585,8 @@ class MainWindow(QWidget):
             self.select_tree_item_by_proxy_index(first_row_index)
             # self.handle_item_selection_by_proxy_index(first_row_index)
 
+        self.shortcut = QShortcut(QKeySequence("Ctrl+L"), self)
+        self.shortcut.activated.connect(self.set_focus_to_search_box)
 
         app_name = 'Snippets Everything'
         self.setWindowTitle(app_name)
@@ -636,6 +638,9 @@ class MainWindow(QWidget):
         for col in range(column_count):
             width = self.settings.value(f"tree_column_width/{col}", defaultValue=100, type=int)
             self.tree.setColumnWidth(col, width)
+
+    def set_focus_to_search_box(self):
+        self.search_box.setFocus()
 
     def filter_tree_view_slot(self, text):
         if self.regex_check_box.isChecked():
