@@ -59,7 +59,7 @@ STYLES = {
     'comment': format([70, 70, 70], 'italic'),
     'self': format([150, 85, 140], 'italic'),
     'numbers': format([100, 150, 190]),
-    'placeholder': format([255, 0, 0], 'bold')
+    'placeholder': format([255, 0, 255], 'bold') # magenta
 }
 
 
@@ -897,7 +897,7 @@ class MainWindow(QWidget):
         if unique_placeholders:
             for row, placeholder in enumerate(unique_placeholders):
                 label = QLabel(placeholder)
-                label.setStyleSheet('QLabel { color: red; font-weight: bold; padding: 5px; }')
+                label.setStyleSheet('QLabel { color: magenta; font-weight: bold; padding: 5px; }')
                 input_field = LineEditPasteDate()
                 input_field.textChanged.connect(self.input_field_changed)
                 # 恢复之前输入框的值
@@ -931,7 +931,7 @@ class MainWindow(QWidget):
             for placeholder, input_field in self.input_widgets.items():
                 replacement = input_field.text()
                 if replacement:
-                    code = code.replace(placeholder, f'<span style="color: black; font-weight: bold;">{replacement}</span>')
+                    code = code.replace(placeholder, f'<span style="color: magenta; font-weight: bold;">{replacement}</span>')
 
             replaced_code = (f'<p style="white-space: pre-wrap; color: green;">{code}</p>')
             self.text_edit_replaced.setHtml(replaced_code)
