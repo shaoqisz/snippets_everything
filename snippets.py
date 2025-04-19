@@ -186,6 +186,13 @@ class MainWindow(QWidget):
         self.shortcut = QShortcut(QKeySequence("Ctrl+L"), self)
         self.shortcut.activated.connect(self.set_focus_to_search_box)
 
+        self.shortcut = QShortcut(QKeySequence("Ctrl+1"), self)
+        self.shortcut.activated.connect(self.set_focus_to_tree_view)
+
+        self.shortcut = QShortcut(QKeySequence("Ctrl+2"), self)
+        self.shortcut.activated.connect(self.set_focus_to_text_edit)
+
+
         app_name = 'Snippets Everything'
         self.setWindowTitle(app_name)
         self.setGeometry(100, 100, 800, 600)
@@ -239,6 +246,12 @@ class MainWindow(QWidget):
 
     def set_focus_to_search_box(self):
         self.search_box.setFocus()
+
+    def set_focus_to_tree_view(self):
+        self.tree.setFocus()
+
+    def set_focus_to_text_edit(self):
+        self.text_edit.setFocus()
 
     def filter_tree_view_slot(self, text):
         if self.regex_check_box.isChecked():
