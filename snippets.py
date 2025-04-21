@@ -3,6 +3,7 @@ import re
 import os
 import json
 import datetime
+import markdown
 
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTextEdit, QShortcut, QLineEdit, QPushButton, QHBoxLayout, QGridLayout, QMessageBox, QAction, QCheckBox, QHeaderView, QLabel, QTreeView, QSplitter, QComboBox, QAbstractItemView
 from PyQt5.QtGui import QColor, QTextCharFormat, QFont, QSyntaxHighlighter, QKeySequence, QStandardItemModel, QStandardItem, QIcon, QKeyEvent, QTextCursor
@@ -102,7 +103,7 @@ class MainWindow(QWidget):
         # 允许 title_lineedit 被修改
         self.title_lineedit.setReadOnly(False)
         self.type_combobox = QComboBox()
-        self.type_combobox.addItems(['Plain text', 'Python', 'C++'])
+        self.type_combobox.addItems(['Plain text', 'Python', 'C++', 'Markdown'])
         self.type_combobox.currentTextChanged.connect(self.apply_highlighter)
 
         info_layout.addWidget(self.title_lineedit)
@@ -533,25 +534,57 @@ class MainWindow(QWidget):
         # print('input_field_changed')
         self.replace_placeholders()
 
+    def replace_placeholders_with_inputs(self, code, replacement_fmt=None):
+        for placeholder, input_field in self.input_widgets.items():
+            replacement = input_field.text()
+            if replacement:
+                if replacement_fmt is not None:
+                    code = code.replace(placeholder, replacement_fmt.format(replacement))
+                else:
+                    code = code.replace(placeholder, replacement)
+        return code
+
     def replace_placeholders(self):
         # print('replace_placeholders')
         code = self.text_edit.toPlainText()
 
         replaced_code = ''
         if self.type_combobox.currentText() == 'Plain text':
-            for placeholder, input_field in self.input_widgets.items():
-                replacement = input_field.text()
-                if replacement:
-                    code = code.replace(placeholder, f'<span style="color: magenta; font-weight: bold;">{replacement}</span>')
+            replaced_code = self.replace_placeholders_with_inputs(code, '<span style="color: magenta; font-weight: bold;">{}</span>')
+            html = (f'<p style="white-space: pre-wrap; color: green;">{replaced_code}</p>')
+            self.text_edit_replaced.setHtml(html)
 
-            replaced_code = (f'<p style="white-space: pre-wrap; color: green;">{code}</p>')
-            self.text_edit_replaced.setHtml(replaced_code)
+        elif self.type_combobox.currentText() == 'Markdown':
+            html = """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Simple Code Highlighting with CSS</title>
+                <style>
+                    p code {
+                        font-family: 'Courier New', Courier, monospace;
+                        border: 1px solid #ccc;
+                        border-radius: 3px;
+                        padding: 2px 5px;
+                        color: #c7254e;
+                        white-space: pre-wrap;
+                        word-wrap: break-word;
+                    }
+                </style>
+            </head>
+                <body>
+                    __replace__
+                </body>
+            </html>   
+            """
+            replaced_code = self.replace_placeholders_with_inputs(code)
+            html_body = markdown.markdown(replaced_code)
+            html = html.replace('__replace__', html_body)
+            self.text_edit_replaced.setHtml(html)
         else:
-            for placeholder, input_field in self.input_widgets.items():
-                replacement = input_field.text()
-                if replacement:
-                    code = code.replace(placeholder, replacement)
-            replaced_code = code
+            replaced_code = self.replace_placeholders_with_inputs(code)
             self.text_edit_replaced.setPlainText(replaced_code)
 
     def save_snippet(self):
@@ -648,12 +681,10 @@ class MainWindow(QWidget):
         if snippet_type == 'Python':
             self.python_highlighter.setDocument(self.text_edit.document())
             self.python_highlighter_replaced.setDocument(self.text_edit_replaced.document())
-
         elif snippet_type == 'C++':
             self.cpp_highlighter.setDocument(self.text_edit.document())
             self.cpp_highlighter_replaced.setDocument(self.text_edit_replaced.document())
-
-        else:
+        elif snippet_type == 'Plain text' or snippet_type == 'Markdown':
             self.plain_text_highlighter.setDocument(self.text_edit.document())
             self.plain_text_highlighter_replaced.setDocument(self.text_edit_replaced.document())
 

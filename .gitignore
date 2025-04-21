@@ -6,3 +6,4 @@ search_history_*.txt
 dist/
 build/
 *.spec
+bk/
