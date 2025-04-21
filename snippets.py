@@ -549,34 +549,34 @@ class MainWindow(QWidget):
             self.text_edit_replaced.setHtml(html)
 
         elif self.type_combobox.currentText() == 'Markdown':
-            html = """
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Simple Code Highlighting with CSS</title>
-                <style>
-                    p code {
-                        font-family: 'Courier New', Courier, monospace;
-                        border: 1px solid #ccc;
-                        border-radius: 3px;
-                        padding: 2px 5px;
-                        color: #c7254e;
-                        white-space: pre-wrap;
-                        word-wrap: break-word;
-                    }
-                </style>
-            </head>
-                <body>
-                    __replace__
-                </body>
-            </html>   
-            """
             replaced_code = self.replace_placeholders_with_inputs(code)
-            html_body = markdown.markdown(replaced_code)
-            html = html.replace('__replace__', html_body)
-            self.text_edit_replaced.setHtml(html)
+            html_body = markdown.markdown(replaced_code, extensions=['fenced_code'])
+            # print(f'html_body={html_body}')
+            html_template = f"""
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Code Block Example</title>
+                    <style>
+                        pre code {{
+                            font-family: 'Courier New', Courier, monospace;
+                            border: 1px solid #ccc;
+                            border-radius: 3px;
+                            padding: 2px 5px;
+                            color: #c7254e;
+                            white-space: pre-wrap;
+                            word-wrap: break-word;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    {html_body}
+                </body>
+                </html>
+            """
+            self.text_edit_replaced.setHtml(html_template)
         else:
             replaced_code = self.replace_placeholders_with_inputs(code)
             self.text_edit_replaced.setPlainText(replaced_code)
