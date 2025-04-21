@@ -131,14 +131,8 @@ class MainWindow(QWidget):
         self.text_edit_replaced.setReadOnly(True)
         self.text_edit_replaced_search = TextEditSearch(self.text_edit_replaced)
 
-
-        self.python_highlighter = PythonHighlighter(self.text_edit.document())
-        self.cpp_highlighter = CppHighlighter(self.text_edit.document())
-        self.plain_text_highlighter = PlainTextHighlighter(self.text_edit.document())
-
-        self.python_highlighter_replaced = PythonHighlighter(self.text_edit_replaced.document())
-        self.cpp_highlighter_replaced = CppHighlighter(self.text_edit_replaced.document())
-        self.plain_text_highlighter_replaced = PlainTextHighlighter(self.text_edit_replaced.document())
+        self.highlighter = None
+        self.highlighter_replaced = None
 
         self.text_edit.textChanged.connect(self.text_edit_changed)
 
@@ -679,14 +673,14 @@ class MainWindow(QWidget):
 
     def apply_highlighter(self, snippet_type):
         if snippet_type == 'Python':
-            self.python_highlighter.setDocument(self.text_edit.document())
-            self.python_highlighter_replaced.setDocument(self.text_edit_replaced.document())
+            self.highlighter = PythonHighlighter(self.text_edit.document())
+            self.highlighter_replaced = PythonHighlighter(self.text_edit_replaced.document())
         elif snippet_type == 'C++':
-            self.cpp_highlighter.setDocument(self.text_edit.document())
-            self.cpp_highlighter_replaced.setDocument(self.text_edit_replaced.document())
+            self.highlighter = CppHighlighter(self.text_edit.document())
+            self.highlighter_replaced = CppHighlighter(self.text_edit_replaced.document())
         elif snippet_type == 'Plain text' or snippet_type == 'Markdown':
-            self.plain_text_highlighter.setDocument(self.text_edit.document())
-            self.plain_text_highlighter_replaced.setDocument(self.text_edit_replaced.document())
+            self.highlighter = PlainTextHighlighter(self.text_edit.document())
+            self.highlighter_replaced = PlainTextHighlighter(self.text_edit_replaced.document())
 
     def delete_snippet(self):
         reply = QMessageBox.question(self, 'Confirm Deletion', 'Are you sure you want to delete this item?',
